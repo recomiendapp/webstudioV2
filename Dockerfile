@@ -36,16 +36,7 @@ RUN ls -la /app/apps/builder/public
 # Copy the build output into the deployed directory
 RUN cp -r /app/apps/builder/build /app/deployed/build
 RUN cp -r /app/apps/builder/public /app/deployed/public
-RUN ls -la /app/deployed/
 
-# Find the actual server index.js path (Remix Vite creates a runtime-specific subfolder)
-# and create a symlink for easier access
-RUN SERVER_INDEX=$(find /app/deployed/build/server -name "index.js" -type f | head -1) && \
-    echo "Found server index at: $SERVER_INDEX" && \
-    ln -sf "$SERVER_INDEX" /app/deployed/build/server/index.js || true
-
-# Debug: Verify the symlink
-RUN ls -la /app/deployed/build/server/
 
 # ============================================
 # Stage 3: Production runner
@@ -66,7 +57,14 @@ RUN adduser --system --uid 1001 webstudio
 # Copy the deployed application with build output included
 COPY --from=builder --chown=webstudio:nodejs /app/deployed ./
 
-RUN ls -la /app/build/server/
+# Find the actual server index.js path (Remix Vite creates a runtime-specific subfolder)
+# and create a symlink for easier access
+RUN --chown=webstudio:nodejs SERVER_INDEX=$(find /app/build/server -name "index.js" -type f | head -1) && \
+    echo "Found server index at: $SERVER_INDEX" && \
+    ln -sf "$SERVER_INDEX" /app/build/server/index.js || true
+
+
+RUN ls -la /app
 
 USER webstudio
 
