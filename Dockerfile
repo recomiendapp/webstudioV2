@@ -65,6 +65,12 @@ RUN adduser --system --uid 1001 webstudio
 # Copy the deployed application with build output included
 COPY --from=builder --chown=webstudio:nodejs /app/deployed ./
 
+RUN SERVER_INDEX=$(find /app/build/server -name "index.js" -type f | head -1) && \
+    echo "Found server index at: $SERVER_INDEX" && \
+    ln -sf "$SERVER_INDEX" /app/build/server/index.js || true
+
+RUN ls -la /app/build/server/
+
 USER webstudio
 
 EXPOSE 3000
