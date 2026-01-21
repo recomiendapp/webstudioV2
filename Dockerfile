@@ -29,18 +29,11 @@ RUN pnpm build
 # Deploy the builder app to a standalone directory
 # pnpm deploy creates a self-contained directory without symlinks
 RUN pnpm --filter=@webstudio-is/builder deploy --prod /app/deployed
+RUN cp -r apps/builder/build /app/deployed/build
+RUN cp -r apps/builder/public /app/deployed/public
 
-RUN ls -la /app/apps/builder/build
-RUN ls -la /app/apps/builder/public
-
-# Copy the build output into the deployed directory
-RUN cp -r /app/apps/builder/build /app/deployed/build
-RUN cp -r /app/apps/builder/public /app/deployed/public
-
-# 3. FIX CRÍTICO: En lugar de un symlink, COPIAMOS el archivo para que 
-# no pierda la referencia a las node_modules al cambiar de Stage
-RUN REAL_FILE=$(find /app/deployed/build/server -name "index.js" -type f | head -1) && \
-    cp "$REAL_FILE" /app/deployed/build/server/index.js
+# NO muevas el index.js. Solo localiza la ruta para el siguiente paso.
+RUN find /app/deployed/build/server -name "index.js"
 
 # ============================================
 # Stage 3: Production runner
@@ -48,26 +41,23 @@ RUN REAL_FILE=$(find /app/deployed/build/server -name "index.js" -type f | head 
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install openssl for Prisma
 RUN apk add --no-cache openssl
-
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 webstudio
+# 1. Crear el usuario y grupo primero
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 webstudio
 
-# Copy the deployed application with build output included
+# 2. Copiar los archivos asegurando que el dueño sea el nuevo usuario (--chown)
+# Esto es vital para que el usuario webstudio pueda leer/ejecutar los módulos
 COPY --from=builder --chown=webstudio:nodejs /app/deployed ./
 
-RUN ls -la /app
-# Verificamos que el archivo esté ahí físicamente
-RUN ls -la build/server/index.js
-
-USER node
+# 3. Cambiar al usuario no-root
+USER webstudio
 
 EXPOSE 3000
 
-# Start the Remix server
-CMD ["node", "build/server/index.js"]
+# 4. El comando dinámico que respeta la seguridad y las rutas de Vite
+CMD ["sh", "-c", "node $(find build/server -name 'index.js' | head -1)"]
