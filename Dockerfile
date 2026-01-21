@@ -37,6 +37,10 @@ RUN ls -la /app/apps/builder/public
 RUN cp -r /app/apps/builder/build /app/deployed/build
 RUN cp -r /app/apps/builder/public /app/deployed/public
 
+# 3. FIX CRÍTICO: En lugar de un symlink, COPIAMOS el archivo para que 
+# no pierda la referencia a las node_modules al cambiar de Stage
+RUN REAL_FILE=$(find /app/deployed/build/server -name "index.js" -type f | head -1) && \
+    cp "$REAL_FILE" /app/deployed/build/server/index.js
 
 # ============================================
 # Stage 3: Production runner
@@ -57,19 +61,13 @@ RUN adduser --system --uid 1001 webstudio
 # Copy the deployed application with build output included
 COPY --from=builder --chown=webstudio:nodejs /app/deployed ./
 
-# Find the actual server index.js path (Remix Vite creates a runtime-specific subfolder)
-# and create a symlink for easier access
-RUN SERVER_INDEX=$(find /app/build/server -name "index.js" -type f | head -1) && \
-    echo "Found server index at: $SERVER_INDEX" && \
-    ln -sf "$SERVER_INDEX" /app/build/server/index.js || true
-
-RUN chown webstudio:nodejs /app/build/server/index.js 
-
 RUN ls -la /app
+# Verificamos que el archivo esté ahí físicamente
+RUN ls -la build/server/index.js
 
-USER webstudio
+USER node
 
 EXPOSE 3000
 
 # Start the Remix server
-CMD ["node", "node_modules/@remix-run/serve/dist/cli.js", "build/server/index.js"]
+CMD ["node", "build/server/index.js"]
