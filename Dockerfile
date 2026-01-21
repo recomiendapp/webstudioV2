@@ -59,10 +59,11 @@ COPY --from=builder --chown=webstudio:nodejs /app/deployed ./
 
 # Find the actual server index.js path (Remix Vite creates a runtime-specific subfolder)
 # and create a symlink for easier access
-RUN --chown=webstudio:nodejs SERVER_INDEX=$(find /app/build/server -name "index.js" -type f | head -1) && \
+RUN SERVER_INDEX=$(find /app/build/server -name "index.js" -type f | head -1) && \
     echo "Found server index at: $SERVER_INDEX" && \
     ln -sf "$SERVER_INDEX" /app/build/server/index.js || true
 
+RUN chown webstudio:nodejs /app/build/server/index.js 
 
 RUN ls -la /app
 
