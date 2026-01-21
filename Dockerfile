@@ -32,7 +32,7 @@ RUN pnpm --filter=@webstudio-is/builder deploy --prod /app/deployed
 
 RUN ls -la /app/apps/builder/build
 RUN ls -la /app/apps/builder/public
-
+RUN ls -la /app/
 # Copy the build output into the deployed directory
 RUN cp -r /app/apps/builder/build /app/deployed/build
 RUN cp -r /app/apps/builder/public /app/deployed/public
