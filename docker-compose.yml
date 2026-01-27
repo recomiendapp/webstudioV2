@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  webstudio-app:
+    image: node:20
+    container_name: webstudio-app-new
+    working_dir: /app
+    environment:
+      - DATABASE_URL=postgresql://webstudio_user:secure_password_2024@webstudio-postgres:5432/webstudio
+      - DIRECT_URL=postgresql://webstudio_user:secure_password_2024@webstudio-postgres:5432/webstudio
+      - AUTH_SECRET=webstudio-super-secret-auth-key-2024-production
+      - DEV_LOGIN=true
+      - DEPLOYMENT_ENVIRONMENT=production
+      - DEPLOYMENT_URL=https://builder.recomend.app
+      - PORT=3000
+      - PRISMA_BINARY_TARGET=["native"]
+      - NODE_ENV=production
+      - FEATURES=""
+      - USER_PLAN=""
+    volumes:
+      - /home/arthur/webstudio:/app
+    networks:
+      - webstudio-network
+      - traefik-net
+    restart: unless-stopped
+    command: >
+      sh -c "
+        npm install -g pnpm@9.14.4 &&
+        pnpm install &&
+        cd packages/prisma-client &&
+        PRISMA_BINARY_TARGET='[\"native\"]' pnpm exec prisma generate &&
+        PRISMA_BINARY_TARGET='[\"native\"]' pnpm exec prisma db push &&
+        cd /app &&
+        pnpm build &&
+        pnpm --filter='@webstudio-is/builder' start
+      "
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-net"
+      - "traefik.http.routers.webstudio.rule=Host('builder.recomiend.app')"
+      - "traefik.http.routers.webstudio.entrypoints=websecure"
+      - "traefik.http.routers.webstudio.tls.certresolver=letsencrypt"
+      - "traefik.http.services.webstudio.loadbalancer.server.port=3001"
+
+networks:
+  webstudio-network:
+    external: true
+  traefik-net:
+    external: true
